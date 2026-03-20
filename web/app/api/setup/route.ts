@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { getEnv, logEnvironmentHealthOnce } from '@/lib/env'
+import { getEnv, getSupabasePublicEnv, logEnvironmentHealthOnce } from '@/lib/env'
 import { logError, logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
+
+
+function getSetupApiEnvError(): string | null {
+  const { url } = getSupabasePublicEnv()
+  const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY')
+
+  if (!url) {
+    return 'Missing NEXT_PUBLIC_SUPABASE_URL in the web app environment'
+  }
+
+  if (!serviceRoleKey) {
+    return 'Missing SUPABASE_SERVICE_ROLE_KEY in the web app environment'
+  }
+
+  return null
+}
 
 function checkSecret(request: NextRequest): boolean {
   const secret = getEnv('SETUP_SECRET')
@@ -38,6 +54,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const envError = getSetupApiEnvError()
+    if (envError) {
+      return NextResponse.json({ error: envError }, { status: 500 })
+    }
+
     const supabase = createServiceClient()
 
     if (!(await isBootstrapAllowed(supabase))) {
@@ -90,6 +111,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const envError = getSetupApiEnvError()
+    if (envError) {
+      return NextResponse.json({ error: envError }, { status: 500 })
+    }
+
     const supabase = createServiceClient()
     const { data, error } = await supabase
       .from('profiles')
@@ -113,6 +139,11 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
+    const envError = getSetupApiEnvError()
+    if (envError) {
+      return NextResponse.json({ error: envError }, { status: 500 })
+    }
+
     const supabase = createServiceClient()
     const { userId, password } = await request.json()
 
@@ -138,6 +169,11 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
+    const envError = getSetupApiEnvError()
+    if (envError) {
+      return NextResponse.json({ error: envError }, { status: 500 })
+    }
+
     const supabase = createServiceClient()
     const { userId } = await request.json()
 
