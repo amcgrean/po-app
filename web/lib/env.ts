@@ -44,6 +44,10 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+function isSupabaseSecretKey(token: string): boolean {
+  return token.startsWith('sb_secret_')
+}
+
 export function getEnv(name: string): string | undefined {
   return readEnv(name)
 }
@@ -97,6 +101,10 @@ export function getSupabaseServiceEnvError() {
     return `${keySource} contains a ${jwtRole} JWT. Use the server-only service_role/secret key instead of the anon/publishable key.`
   }
 
+  if (!isLegacyJwt && !isSupabaseSecretKey(serviceKey)) {
+    return `${keySource} is present but does not look like a valid Supabase server key. Use the legacy service_role JWT in SUPABASE_SERVICE_ROLE_KEY or the new sb_secret_ key in SUPABASE_SECRET_KEY, and make sure it matches NEXT_PUBLIC_SUPABASE_URL.`
+  }
+
   return null
 }
 
@@ -132,6 +140,12 @@ export function logEnvironmentHealthOnce(source: string) {
     logWarn('Supabase service key env appears to contain a non-service JWT', {
       supabaseServiceKeySource: serviceKeySource,
       supabaseServiceJwtRole: jwtRole,
+    })
+  }
+
+  if (serviceKeySource && serviceKey && !jwtRole && !isSupabaseSecretKey(serviceKey)) {
+    logWarn('Supabase service key env appears malformed or mismatched for this project', {
+      supabaseServiceKeySource: serviceKeySource,
     })
   }
 

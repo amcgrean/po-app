@@ -10,6 +10,13 @@ import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
+function getSupabaseKeyHint(message: string): string {
+  const normalizedMessage = String(message).toLowerCase()
+
+  return normalizedMessage.includes('invalid api key') || normalizedMessage.includes('invalid jwt')
+    ? ' Supabase rejected the server key. In your deployment environment, set SUPABASE_SERVICE_ROLE_KEY (legacy JWT) or SUPABASE_SECRET_KEY (new sb_secret_ key), and make sure it matches NEXT_PUBLIC_SUPABASE_URL.'
+    : ''
+}
 
 function getSetupApiEnvError(): string | null {
   const { url } = getSupabasePublicEnv()
@@ -103,16 +110,9 @@ export async function POST(request: NextRequest) {
     logError('Create user error', error)
 
     const message = error?.message || 'Failed to create user'
-    const normalizedMessage = String(message).toLowerCase()
-    const envHint =
-      normalizedMessage.includes('invalid api key') || normalizedMessage.includes('invalid jwt')
-        ? ' Supabase rejected the server key. In your deployment environment, set SUPABASE_SERVICE_ROLE_KEY (legacy JWT) or SUPABASE_SECRET_KEY (new secret key), and make sure it is not the public anon/publishable key.'
-        : ''
+    const envHint = getSupabaseKeyHint(message)
 
-    return NextResponse.json(
-      { error: `${message}${envHint}` },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: `${message}${envHint}` }, { status: 500 })
   }
 }
 
@@ -140,7 +140,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data)
   } catch (error: any) {
     logError('Fetch setup users error', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const message = error?.message || 'Failed to fetch setup users'
+    return NextResponse.json({ error: `${message}${getSupabaseKeyHint(message)}` }, { status: 500 })
   }
 }
 
@@ -170,7 +171,8 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error: any) {
     logError('Reset password error', error)
-    return NextResponse.json({ error: error.message || 'Failed to reset password' }, { status: 500 })
+    const message = error?.message || 'Failed to reset password'
+    return NextResponse.json({ error: `${message}${getSupabaseKeyHint(message)}` }, { status: 500 })
   }
 }
 
@@ -200,6 +202,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error: any) {
     logError('Delete user error', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const message = error?.message || 'Failed to delete user'
+    return NextResponse.json({ error: `${message}${getSupabaseKeyHint(message)}` }, { status: 500 })
   }
 }
