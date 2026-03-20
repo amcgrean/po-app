@@ -1,4 +1,4 @@
-const LOG_PREFIX = '[po-pics]'
+const LOG_PREFIX = '[po-app]'
 
 export function logInfo(message: string, meta?: Record<string, unknown>) {
   if (meta) {
