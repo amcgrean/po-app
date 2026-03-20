@@ -17,7 +17,7 @@ npm run dev
 
 ## Environment setup
 
-Copy `web/.env.local.example` to `web/.env.local` and fill in the required values before running the app. The setup/user-management flow also requires `SUPABASE_SERVICE_ROLE_KEY` in the web app runtime environment; `SETUP_SECRET` is only checked by this web app and does not belong in Supabase/Postgres itself.
+Copy `web/.env.local.example` to `web/.env.local` and fill in the required values before running the app. The setup/user-management flow requires a server Supabase key in the web app runtime environment: use `SUPABASE_SERVICE_ROLE_KEY` for the legacy JWT-style key or `SUPABASE_SECRET_KEY` for the newer secret key. `SETUP_SECRET` is only checked by this web app and does not belong in Supabase/Postgres itself.
 
 ## Main scripts
 
