@@ -7,12 +7,10 @@ This is the new merged web-app workspace being built inside the existing `po-che
 - use the `po-pics` Next.js app as the web foundation
 - point PO lookup at the shared `agility_api` Supabase database
 - gradually absorb the old Electron PO check-in sheet workflows
-- keep the legacy Electron files at the repo root for reference during migration
 
 ## Status
 
-- local-only scaffold
-- no GitHub remote work from this app yet
+- active application workspace
 - no database migrations or view SQL have been applied yet
 
 ## Expected database target
