@@ -1,6 +1,11 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { getEnv, getSupabasePublicEnv, logEnvironmentHealthOnce } from '@/lib/env'
+import {
+  getSupabasePublicEnv,
+  getSupabaseServiceEnv,
+  getSupabaseServiceEnvError,
+  logEnvironmentHealthOnce,
+} from '@/lib/env'
 import { logWarn } from '@/lib/logger'
 
 export async function createClient() {
@@ -35,14 +40,21 @@ export function createServiceClient() {
   logEnvironmentHealthOnce('supabase-server-createServiceClient')
 
   const { url } = getSupabasePublicEnv()
-  const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY')
+  const { serviceKey } = getSupabaseServiceEnv()
+  const serviceEnvError = getSupabaseServiceEnvError()
 
-  if (!url || !serviceRoleKey) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !serviceKey) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_SUPABASE_URL or a server Supabase key (SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SECRET_KEY)'
+    )
+  }
+
+  if (serviceEnvError) {
+    throw new Error(serviceEnvError)
   }
 
   const { createClient } = require('@supabase/supabase-js')
-  return createClient(url, serviceRoleKey, {
+  return createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 }

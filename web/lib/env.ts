@@ -27,6 +27,23 @@ function readEnv(name: string): string | undefined {
   return normalizeEnvValue(process.env[name])
 }
 
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split('.')
+  if (parts.length !== 3) {
+    return null
+  }
+
+  try {
+    const payload = parts[1]
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    const decoded = Buffer.from(padded, 'base64').toString('utf8')
+    return JSON.parse(decoded) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
 export function getEnv(name: string): string | undefined {
   return readEnv(name)
 }
@@ -49,6 +66,40 @@ export function getSupabasePublicEnv() {
   }
 }
 
+export function getSupabaseServiceEnv() {
+  const legacyServiceRoleKey = readEnv('SUPABASE_SERVICE_ROLE_KEY')
+  const secretKey = readEnv('SUPABASE_SECRET_KEY')
+  const serviceKey = legacyServiceRoleKey || secretKey
+
+  const jwtPayload = serviceKey ? parseJwtPayload(serviceKey) : null
+  const jwtRole = typeof jwtPayload?.role === 'string' ? jwtPayload.role : undefined
+
+  return {
+    serviceKey,
+    keySource: legacyServiceRoleKey
+      ? 'SUPABASE_SERVICE_ROLE_KEY'
+      : secretKey
+        ? 'SUPABASE_SECRET_KEY'
+        : undefined,
+    isLegacyJwt: Boolean(serviceKey && serviceKey.split('.').length === 3),
+    jwtRole,
+  }
+}
+
+export function getSupabaseServiceEnvError() {
+  const { serviceKey, keySource, isLegacyJwt, jwtRole } = getSupabaseServiceEnv()
+
+  if (!serviceKey) {
+    return 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY in the web app environment'
+  }
+
+  if (isLegacyJwt && jwtRole && jwtRole !== 'service_role') {
+    return `${keySource} contains a ${jwtRole} JWT. Use the server-only service_role/secret key instead of the anon/publishable key.`
+  }
+
+  return null
+}
+
 export function hasSupabasePublicEnv() {
   const { url, anonKey } = getSupabasePublicEnv()
   return Boolean(url && anonKey)
@@ -60,19 +111,28 @@ export function logEnvironmentHealthOnce(source: string) {
   }
 
   const { url, anonKey, keySource } = getSupabasePublicEnv()
-  const serviceRole = readEnv('SUPABASE_SERVICE_ROLE_KEY')
+  const { serviceKey, keySource: serviceKeySource, jwtRole } = getSupabaseServiceEnv()
   const setupSecret = readEnv('SETUP_SECRET')
 
   logInfo(`Environment health snapshot from ${source}`, {
     hasSupabaseUrl: Boolean(url),
     hasSupabaseAnonKey: Boolean(anonKey),
     supabasePublicKeySource: keySource || null,
-    hasServiceRoleKey: Boolean(serviceRole),
+    hasServiceRoleKey: Boolean(serviceKey),
+    supabaseServiceKeySource: serviceKeySource || null,
+    supabaseServiceJwtRole: jwtRole || null,
     hasSetupSecret: Boolean(setupSecret),
   })
 
   if (!url || !anonKey) {
     logWarn('Missing public Supabase env vars; auth-dependent flows may fail')
+  }
+
+  if (serviceKeySource && jwtRole && jwtRole !== 'service_role') {
+    logWarn('Supabase service key env appears to contain a non-service JWT', {
+      supabaseServiceKeySource: serviceKeySource,
+      supabaseServiceJwtRole: jwtRole,
+    })
   }
 
   hasLoggedEnvironment = true

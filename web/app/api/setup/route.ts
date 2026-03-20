@@ -1,21 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { getEnv, getSupabasePublicEnv, logEnvironmentHealthOnce } from '@/lib/env'
-import { logError, logWarn } from '@/lib/logger'
+import {
+  getEnv,
+  getSupabasePublicEnv,
+  getSupabaseServiceEnvError,
+  logEnvironmentHealthOnce,
+} from '@/lib/env'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
 
 function getSetupApiEnvError(): string | null {
   const { url } = getSupabasePublicEnv()
-  const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY')
 
   if (!url) {
     return 'Missing NEXT_PUBLIC_SUPABASE_URL in the web app environment'
   }
 
-  if (!serviceRoleKey) {
-    return 'Missing SUPABASE_SERVICE_ROLE_KEY in the web app environment'
+  const serviceEnvError = getSupabaseServiceEnvError()
+  if (serviceEnvError) {
+    return serviceEnvError
   }
 
   return null
@@ -96,8 +101,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, userId: data.user.id }, { status: 201 })
   } catch (error: any) {
     logError('Create user error', error)
+
+    const message = error?.message || 'Failed to create user'
+    const normalizedMessage = String(message).toLowerCase()
+    const envHint =
+      normalizedMessage.includes('invalid api key') || normalizedMessage.includes('invalid jwt')
+        ? ' Supabase rejected the server key. In your deployment environment, set SUPABASE_SERVICE_ROLE_KEY (legacy JWT) or SUPABASE_SECRET_KEY (new secret key), and make sure it is not the public anon/publishable key.'
+        : ''
+
     return NextResponse.json(
-      { error: error.message || 'Failed to create user' },
+      { error: `${message}${envHint}` },
       { status: 500 }
     )
   }
