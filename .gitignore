@@ -1,1 +1,18 @@
 node_modules
+
+# Local environment files
+.env
+.env.*
+*.env
+*.local
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Next.js local output
+web/.next/
