@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --green-primary: #006834;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent iOS bounce scroll on the outer body */
+html, body {
+  overscroll-behavior: none;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
