@@ -40,9 +40,11 @@ function SetupContent() {
     setLoading(true)
     try {
       const res = await fetch(`/api/setup?secret=${encodeURIComponent(secret)}`)
-      if (!res.ok) throw new Error('Unauthorized')
-      setUsers(await res.json())
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load users')
+      setUsers(data)
     } catch (err: any) {
+      setUsers([])
       setError(err.message)
     } finally {
       setLoading(false)
@@ -108,7 +110,8 @@ function SetupContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       })
-      if (!res.ok) throw new Error('Failed to delete')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete user')
       await loadUsers()
     } catch (err: any) {
       setError(err.message)
