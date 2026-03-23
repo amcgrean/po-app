@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logError, logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const authClient = await createClient()
+    const serviceClient = createServiceClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
 
     if (!user) {
       logWarn('Unauthorized submission create attempt')
@@ -72,17 +73,18 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const authClient = await createClient()
+    const serviceClient = createServiceClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
 
     if (!user) {
       logWarn('Unauthorized submission list attempt')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await authClient
       .from('profiles')
       .select('role, branch')
       .eq('id', user.id)
@@ -98,7 +100,7 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0')
     const days = parseInt(searchParams.get('days') || '7')
 
-    let query = supabase
+    let query = serviceClient
       .from('submissions')
       .select('*')
       .order('created_at', { ascending: false })
