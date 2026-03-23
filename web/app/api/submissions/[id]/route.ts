@@ -16,7 +16,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { authClient, serviceClient } = await getSubmissionClients()
+    const authClient = await createClient()
+    const serviceClient = createServiceClient()
     const {
       data: { user },
     } = await authClient.auth.getUser()
@@ -71,7 +72,8 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { authClient, serviceClient } = await getSubmissionClients()
+    const authClient = await createClient()
+    const serviceClient = createServiceClient()
     const {
       data: { user },
     } = await authClient.auth.getUser()
