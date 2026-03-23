@@ -37,7 +37,7 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
     const payload = parts[1]
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
-    const decoded = Buffer.from(padded, 'base64').toString('utf8')
+    const decoded = atob(padded)
     return JSON.parse(decoded) as Record<string, unknown>
   } catch {
     return null
