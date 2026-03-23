@@ -6,17 +6,18 @@ export const dynamic = 'force-dynamic'
 
 async function getSubmissionClients() {
   return {
-    supabase: await createClient(),
+    authClient: await createClient(),
     serviceClient: createServiceClient(),
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, serviceClient } = await getSubmissionClients()
+    const authClient = await createClient()
+    const serviceClient = createServiceClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
 
     if (!user) {
       logWarn('Unauthorized submission create attempt')
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const { data, error } = await serviceClient
+    const { data, error } = await supabase
       .from('submissions')
       .insert({
         po_number: po_number.trim().toUpperCase(),
@@ -79,17 +80,18 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const { supabase, serviceClient } = await getSubmissionClients()
+    const authClient = await createClient()
+    const serviceClient = createServiceClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
 
     if (!user) {
       logWarn('Unauthorized submission list attempt')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await authClient
       .from('profiles')
       .select('role, branch')
       .eq('id', user.id)

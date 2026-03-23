@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 async function getSubmissionClients() {
   return {
-    supabase: await createClient(),
+    authClient: await createClient(),
     serviceClient: createServiceClient(),
   }
 }
@@ -16,17 +16,18 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { supabase, serviceClient } = await getSubmissionClients()
+    const authClient = await createClient()
+    const serviceClient = createServiceClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
 
     if (!user) {
       logWarn('Unauthorized submission detail attempt', { submissionId: params.id })
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await authClient
       .from('profiles')
       .select('role, branch')
       .eq('id', user.id)
@@ -71,17 +72,18 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { supabase, serviceClient } = await getSubmissionClients()
+    const authClient = await createClient()
+    const serviceClient = createServiceClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
 
     if (!user) {
       logWarn('Unauthorized submission patch attempt', { submissionId: params.id })
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await authClient
       .from('profiles')
       .select('role, branch')
       .eq('id', user.id)
