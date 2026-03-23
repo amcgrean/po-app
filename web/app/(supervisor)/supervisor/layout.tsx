@@ -24,8 +24,15 @@ export default async function SupervisorLayout({ children }: { children: React.R
               </div>
               <span className="font-bold text-lg hidden sm:block">PO Check-In</span>
             </Link>
-            <span className="text-white/50 hidden sm:block">|</span>
-            <span className="text-white/80 text-sm hidden sm:block">Supervisor Portal</span>
+            <span className="text-white/50 hidden md:block">|</span>
+            <div className="hidden md:flex items-center gap-2 text-sm">
+              <Link href="/supervisor" className="rounded-lg px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">
+                Dashboard
+              </Link>
+              <Link href="/supervisor/open-pos" className="rounded-lg px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">
+                Open POs
+              </Link>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-white/80 text-sm hidden sm:block">{displayName}</span>

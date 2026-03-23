@@ -66,6 +66,19 @@ export default function SupervisorPage() {
 
   return (
     <div>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Supervisor Dashboard</h1>
+          <p className="text-sm text-gray-500">Review submissions and browse open branch POs from the ERP mirror.</p>
+        </div>
+        <Link
+          href="/supervisor/open-pos"
+          className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm border border-gray-200 hover:bg-gray-50"
+        >
+          View open branch POs
+        </Link>
+      </div>
+
       {/* Stats bar */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
