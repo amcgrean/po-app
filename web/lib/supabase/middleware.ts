@@ -97,6 +97,11 @@ export async function updateSession(request: NextRequest) {
     const role = profile?.role
 
     if (pathname === '/' || pathname === '') {
+      if (role === 'admin') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/admin/users'
+        return NextResponse.redirect(url)
+      }
       if (role === 'supervisor') {
         const url = request.nextUrl.clone()
         url.pathname = '/supervisor'
@@ -109,7 +114,18 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
-    if (pathname.startsWith('/supervisor') && !(['supervisor', 'manager'].includes(role || ''))) {
+    if (pathname.startsWith('/admin') && role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      logInfo('Redirecting non-admin user from admin route', {
+        ...requestLogContext(request),
+        userId: user.id,
+        role,
+      })
+      return NextResponse.redirect(url)
+    }
+
+    if (pathname.startsWith('/supervisor') && !(['admin', 'supervisor', 'manager'].includes(role || ''))) {
       const url = request.nextUrl.clone()
       url.pathname = '/'
       logInfo('Redirecting non-elevated user from supervisor route', {
@@ -120,7 +136,7 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    if (pathname.startsWith('/manager') && !(['supervisor', 'manager'].includes(role || ''))) {
+    if (pathname.startsWith('/manager') && !(['admin', 'supervisor', 'manager'].includes(role || ''))) {
       const url = request.nextUrl.clone()
       url.pathname = '/'
       logInfo('Redirecting non-elevated user from manager route', {

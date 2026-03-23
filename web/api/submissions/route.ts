@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
 
     if (userRole === 'manager' && userBranch) {
       query = query.eq('branch', userBranch)
-    } else if (userRole !== 'supervisor') {
+    } else if (!['admin', 'supervisor'].includes(userRole || '')) {
       query = query.eq('submitted_by', user.id)
     }
 
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status)
     }
 
-    if ((userRole === 'supervisor' || userRole === 'manager') && !poSearch) {
+    if ((['admin', 'supervisor', 'manager'].includes(userRole || '')) && !poSearch) {
       const since = new Date()
       since.setDate(since.getDate() - days)
       query = query.gte('created_at', since.toISOString())

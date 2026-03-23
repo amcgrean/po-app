@@ -2,7 +2,7 @@
 /**
  * seed-admin.mjs
  *
- * Creates an initial supervisor (admin) account directly via the Supabase
+ * Creates an initial admin account directly via the Supabase
  * service-role API.  Run this once on a fresh deployment before any users
  * exist, or whenever you need to bootstrap an admin account.
  *
@@ -11,7 +11,7 @@
  *
  * Required environment variables (can be in .env.local):
  *   NEXT_PUBLIC_SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY
+ *   SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY
  *
  * Optional overrides:
  *   ADMIN_USERNAME   (default: admin)
@@ -40,17 +40,17 @@ try {
 }
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY
 
 if (!supabaseUrl || !serviceRoleKey) {
-  console.error('ERROR: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.')
+  console.error('ERROR: NEXT_PUBLIC_SUPABASE_URL and a server Supabase key (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY) must be set.')
   process.exit(1)
 }
 
 const username    = process.env.ADMIN_USERNAME ?? 'admin'
 const password    = process.env.ADMIN_PASSWORD ?? 'Admin@2024!'
 const displayName = process.env.ADMIN_DISPLAY  ?? 'Admin'
-const role        = 'supervisor'
+const role        = 'admin'
 const email       = `${username}@checkin.internal`
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -63,7 +63,7 @@ const { data, error } = await supabase.auth.admin.createUser({
   email,
   password,
   email_confirm: true,
-  user_metadata: { display_name: displayName, role },
+  user_metadata: { username, display_name: displayName, role, branch: null },
 })
 
 if (error) {
@@ -92,7 +92,7 @@ if (error) {
     // Update profile role
     const { error: profileErr } = await supabase
       .from('profiles')
-      .update({ role: 'supervisor', display_name: displayName })
+      .update({ username, role: 'admin', display_name: displayName, branch: null })
       .eq('id', existing.id)
     
     if (profileErr) {
@@ -110,7 +110,7 @@ if (error) {
 // The trigger creates the profile; update it with the correct username & role
 const { error: profileError } = await supabase
   .from('profiles')
-  .update({ username, display_name: displayName, role })
+  .update({ username, display_name: displayName, role, branch: null })
   .eq('id', data.user.id)
 
 if (profileError) {

@@ -40,7 +40,13 @@ export default function LoginPage() {
         .single()
 
       // Hard redirect so the browser commits auth cookies before the server renders
-      window.location.href = profile?.role === 'supervisor' ? '/supervisor' : '/'
+      if (profile?.role === 'admin') {
+        window.location.href = '/admin/users'
+      } else if (profile?.role === 'supervisor') {
+        window.location.href = '/supervisor'
+      } else {
+        window.location.href = '/'
+      }
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {

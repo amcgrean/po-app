@@ -46,7 +46,7 @@ export async function GET(
     const userRole = profile?.role || user.app_metadata?.role || user.user_metadata?.role
     const userBranch = profile?.branch
     const isOwner = data.submitted_by === user.id
-    const isSupervisor = userRole === 'supervisor'
+    const isSupervisor = ['admin', 'supervisor'].includes(userRole || '')
     const isBranchManager = userRole === 'manager' && userBranch && userBranch === data.branch
 
     if (!isOwner && !isSupervisor && !isBranchManager) {
@@ -101,7 +101,7 @@ export async function PATCH(
 
     const userRole = profile?.role || user.app_metadata?.role || user.user_metadata?.role
     const userBranch = profile?.branch
-    const isSupervisor = userRole === 'supervisor'
+    const isSupervisor = ['admin', 'supervisor'].includes(userRole || '')
     const isBranchManager = userRole === 'manager' && userBranch && userBranch === submission.branch
 
     if (!isSupervisor && !isBranchManager) {
