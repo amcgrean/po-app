@@ -4,6 +4,13 @@ import { logError, logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
+async function getSubmissionClients() {
+  return {
+    authClient: await createClient(),
+    serviceClient: createServiceClient(),
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authClient = await createClient()
