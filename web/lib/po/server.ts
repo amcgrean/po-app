@@ -119,25 +119,19 @@ export async function getPurchaseOrder(poNumber: string): Promise<PoLookupResult
   const supabase = createServiceClient()
   const normalized = poNumber.trim()
 
+  // The erp_mirror_* tables only have po_id (integer); the app_po_* views
+  // derive po_number from it. Querying by the integer po_id lets the
+  // planner use our idx_erp_mirror_*_po_id indexes instead of doing a
+  // full table scan through the po_number expression.
+  const poIdMatch = /^\d+$/.exec(normalized)
+  const filterCol = poIdMatch ? 'po_id' : 'po_number'
+  const filterVal = poIdMatch ? parseInt(normalized, 10) : normalized
+
   const [{ data: header, error: headerError }, { data: detail, error: detailError }, { data: receiving, error: receivingError }] =
     await Promise.all([
-      supabase
-        .from('app_po_header')
-        .select('*')
-        .eq('po_number', normalized)
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('app_po_detail')
-        .select('*')
-        .eq('po_number', normalized)
-        .order('line_number', { ascending: true }),
-      supabase
-        .from('app_po_receiving_summary')
-        .select('*')
-        .eq('po_number', normalized)
-        .limit(1)
-        .maybeSingle(),
+      supabase.from('app_po_header').select('*').eq(filterCol, filterVal).limit(1).maybeSingle(),
+      supabase.from('app_po_detail').select('*').eq(filterCol, filterVal).order('line_number', { ascending: true }),
+      supabase.from('app_po_receiving_summary').select('*').eq(filterCol, filterVal).limit(1).maybeSingle(),
     ])
 
   const firstError = headerError || detailError || receivingError
