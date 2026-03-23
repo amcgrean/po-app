@@ -64,17 +64,19 @@ export async function updateSession(request: NextRequest) {
       return supabaseResponse
     }
 
-    if (userError) {
-      logWarn('Failed to get user in middleware', {
-        ...requestLogContext(request),
-        error: userError.message,
-      })
-    }
-
     if (!user) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
-      logInfo('Redirecting unauthenticated user to login', requestLogContext(request))
+      // 'Auth session missing!' is normal for unauthenticated users — log at info, not warn
+      const isNoSession = userError?.message === 'Auth session missing!'
+      if (userError && !isNoSession) {
+        logWarn('Failed to get user in middleware', {
+          ...requestLogContext(request),
+          error: userError.message,
+        })
+      } else {
+        logInfo('Redirecting unauthenticated user to login', requestLogContext(request))
+      }
       return NextResponse.redirect(url)
     }
 
