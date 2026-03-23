@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import {
   getSupabasePublicEnv,
@@ -53,8 +54,7 @@ export function createServiceClient() {
     throw new Error(serviceEnvError)
   }
 
-  const { createClient } = require('@supabase/supabase-js')
-  return createClient(url, serviceKey, {
+  return createSupabaseClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 }
