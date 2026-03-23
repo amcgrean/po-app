@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await authClient
+    const { data: profile } = await supabase
       .from('profiles')
       .select('username, branch')
       .eq('id', user.id)
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const { data, error } = await serviceClient
+    const { data, error } = await supabase
       .from('submissions')
       .insert({
         po_number: po_number.trim().toUpperCase(),
