@@ -13,8 +13,7 @@ async function getSubmissionClients() {
 
 export async function POST(request: NextRequest) {
   try {
-    const authClient = await createClient()
-    const serviceClient = createServiceClient()
+    const { authClient, serviceClient } = await getSubmissionClients()
     const {
       data: { user },
     } = await authClient.auth.getUser()
@@ -24,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await authClient
       .from('profiles')
       .select('username, branch')
       .eq('id', user.id)
@@ -48,7 +47,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await serviceClient
       .from('submissions')
       .insert({
         po_number: po_number.trim().toUpperCase(),
@@ -80,8 +79,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const authClient = await createClient()
-    const serviceClient = createServiceClient()
+    const { authClient, serviceClient } = await getSubmissionClients()
     const {
       data: { user },
     } = await authClient.auth.getUser()
