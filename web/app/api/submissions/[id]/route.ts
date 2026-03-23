@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logError, logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -9,23 +9,24 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
+    const authClient = await createClient()
+    const serviceClient = createServiceClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
 
     if (!user) {
       logWarn('Unauthorized submission detail attempt', { submissionId: params.id })
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await authClient
       .from('profiles')
       .select('role, branch')
       .eq('id', user.id)
       .maybeSingle()
 
-    const { data, error } = await supabase
+    const { data, error } = await serviceClient
       .from('submissions')
       .select('*')
       .eq('id', params.id)
@@ -35,7 +36,6 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    // Permission check
     const userRole = profile?.role || user.app_metadata?.role || user.user_metadata?.role
     const userBranch = profile?.branch
     const isOwner = data.submitted_by === user.id
@@ -43,12 +43,12 @@ export async function GET(
     const isBranchManager = userRole === 'manager' && userBranch && userBranch === data.branch
 
     if (!isOwner && !isSupervisor && !isBranchManager) {
-      logWarn('Forbidden submission detail access attempt', { 
-        submissionId: params.id, 
+      logWarn('Forbidden submission detail access attempt', {
+        submissionId: params.id,
         userId: user.id,
         role: userRole,
         branch: userBranch,
-        submissionBranch: data.branch
+        submissionBranch: data.branch,
       })
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -65,23 +65,24 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
+    const authClient = await createClient()
+    const serviceClient = createServiceClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
 
     if (!user) {
       logWarn('Unauthorized submission patch attempt', { submissionId: params.id })
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await authClient
       .from('profiles')
       .select('role, branch')
       .eq('id', user.id)
       .maybeSingle()
 
-    const { data: submission } = await supabase
+    const { data: submission } = await serviceClient
       .from('submissions')
       .select('branch')
       .eq('id', params.id)
@@ -97,12 +98,12 @@ export async function PATCH(
     const isBranchManager = userRole === 'manager' && userBranch && userBranch === submission.branch
 
     if (!isSupervisor && !isBranchManager) {
-      logWarn('Forbidden submission patch attempt', { 
-        submissionId: params.id, 
+      logWarn('Forbidden submission patch attempt', {
+        submissionId: params.id,
         userId: user.id,
         role: userRole,
         branch: userBranch,
-        submissionBranch: submission.branch
+        submissionBranch: submission.branch,
       })
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -110,7 +111,7 @@ export async function PATCH(
     const body = await request.json()
     const { status, reviewer_notes } = body
 
-    const { data: updated, error: updateError } = await supabase
+    const { data: updated, error: updateError } = await serviceClient
       .from('submissions')
       .update({
         status,
