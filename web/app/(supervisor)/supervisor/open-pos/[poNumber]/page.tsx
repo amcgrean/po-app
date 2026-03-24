@@ -4,6 +4,27 @@ import { createClient } from '@/lib/supabase/server'
 import { getPurchaseOrder, getPurchaseOrderSubmissions } from '@/lib/po/server'
 import { formatDate, formatDateTime } from '@/lib/utils'
 
+function getDataLoadErrorMessage(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error || '').toLowerCase()
+
+  if (message.includes('missing supabase_service_role_key') || message.includes('missing next_public_supabase_url')) {
+    return 'Server Supabase environment variables are missing in this deployment.'
+  }
+
+  if (message.includes('does not look like a valid supabase server key') || message.includes('non-service jwt')) {
+    return 'The server Supabase key is misconfigured (anon key used where service key is required).'
+  }
+
+  if (message.includes('shared po read-model views are not available')) {
+    return 'Shared PO read-model views are not available in Supabase yet.'
+  }
+
+  return 'PO detail data could not be loaded from Supabase.'
+}
+
 function formatCurrency(value: number | null) {
   if (value == null) return '—'
   return value.toLocaleString(undefined, {
@@ -31,14 +52,42 @@ export default async function SupervisorOpenPoDetailPage({
     : { data: null }
 
   const branch = profile?.branch?.trim().toUpperCase() || null
-  const poResult = await getPurchaseOrder(poNumber)
+  let poResult: Awaited<ReturnType<typeof getPurchaseOrder>> | null = null
+  let submissions: Awaited<ReturnType<typeof getPurchaseOrderSubmissions>> = []
+  let loadErrorMessage: string | null = null
+
+  try {
+    poResult = await getPurchaseOrder(poNumber)
+    if (poResult?.header) {
+      submissions = await getPurchaseOrderSubmissions(poNumber, branch)
+    }
+  } catch (error) {
+    loadErrorMessage = getDataLoadErrorMessage(error)
+  }
+
+  if (loadErrorMessage) {
+    return (
+      <div className="space-y-4">
+        <Link
+          href="/supervisor/open-pos"
+          className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900"
+        >
+          <span>←</span>
+          Back to open POs
+        </Link>
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900">
+          <p className="font-semibold">PO details could not be loaded.</p>
+          <p className="mt-1">{loadErrorMessage}</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!poResult?.header) {
     notFound()
   }
 
   const header = poResult.header
-  const submissions = await getPurchaseOrderSubmissions(poNumber, branch)
 
   return (
     <div className="space-y-6">
