@@ -6,6 +6,27 @@ import {
 } from '@/lib/po/server'
 import { formatDate } from '@/lib/utils'
 
+function getDataLoadErrorMessage(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error || '').toLowerCase()
+
+  if (message.includes('missing supabase_service_role_key') || message.includes('missing next_public_supabase_url')) {
+    return 'Server Supabase environment variables are missing in this deployment.'
+  }
+
+  if (message.includes('does not look like a valid supabase server key') || message.includes('non-service jwt')) {
+    return 'The server Supabase key is misconfigured (anon key used where service key is required).'
+  }
+
+  if (message.includes('shared po read-model views are not available')) {
+    return 'Shared PO read-model views are not available in Supabase yet.'
+  }
+
+  return 'Open PO data could not be loaded from Supabase.'
+}
+
 function formatCurrency(value: number | null) {
   if (value == null) return '—'
   return value.toLocaleString(undefined, {
@@ -34,12 +55,20 @@ export default async function SupervisorOpenPoPage() {
   const branch = profile?.branch?.trim().toUpperCase() || ''
   const displayName = profile?.display_name || profile?.username || 'Supervisor'
 
-  const openPurchaseOrders = branch
-    ? await listOpenPurchaseOrdersForBranch(branch, 150)
-    : []
-  const submissionSummaries = await getSubmissionSummariesForPurchaseOrders(
-    openPurchaseOrders.map(row => row.po_number)
-  )
+  let openPurchaseOrders: Awaited<ReturnType<typeof listOpenPurchaseOrdersForBranch>> = []
+  let submissionSummaries: Awaited<ReturnType<typeof getSubmissionSummariesForPurchaseOrders>> = {}
+  let loadErrorMessage: string | null = null
+
+  if (branch) {
+    try {
+      openPurchaseOrders = await listOpenPurchaseOrdersForBranch(branch, 150)
+      submissionSummaries = await getSubmissionSummariesForPurchaseOrders(
+        openPurchaseOrders.map(row => row.po_number)
+      )
+    } catch (error) {
+      loadErrorMessage = getDataLoadErrorMessage(error)
+    }
+  }
 
   const withImagesCount = openPurchaseOrders.filter(
     row => (submissionSummaries[row.po_number]?.count || 0) > 0
@@ -70,6 +99,16 @@ export default async function SupervisorOpenPoPage() {
       {!branch ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
           Your user profile does not have a branch code yet, so branch-scoped open POs cannot be listed.
+        </div>
+      ) : loadErrorMessage ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900">
+          <p className="font-semibold">Open POs could not be loaded.</p>
+          <p className="mt-1">{loadErrorMessage}</p>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-red-800">
+            <li>Confirm NEXT_PUBLIC_SUPABASE_URL and public Supabase key are set.</li>
+            <li>Confirm SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is set server-side.</li>
+            <li>Confirm app_po_* shared read-model views exist in the connected Supabase project.</li>
+          </ul>
         </div>
       ) : (
         <>
