@@ -98,7 +98,7 @@ export async function listOpenPurchaseOrdersForBranch(
   const { data, error } = await supabase
     .from('app_po_search')
     .select('*')
-    .eq('branch_code', normalized)
+    .eq('system_id', normalized)
     .order('expect_date', { ascending: true, nullsFirst: false })
     .order('order_date', { ascending: false, nullsFirst: false })
     .limit(fetchLimit)
