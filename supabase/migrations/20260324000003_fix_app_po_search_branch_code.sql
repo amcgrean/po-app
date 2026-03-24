@@ -1,0 +1,39 @@
+-- Fix: populate branch_code in app_po_search view.
+--
+-- INSTRUCTIONS: Before running this migration you need to know which column
+-- in erp_mirror_po_header holds the branch/location code for a PO.
+-- Run web/check-branch-codes.mjs locally, or call GET /api/po/diagnostics
+-- while logged in as a supervisor/admin to see all columns and sample values.
+--
+-- Then uncomment ONE of the blocks below (or write your own) and apply it:
+--
+-- ── Option A ── If erp_mirror_po_header has a column literally named "branch_code":
+--
+-- create or replace view public.app_po_search as
+-- select
+--   h.*,
+--   h.branch_code            -- already there, just make sure it's selected
+-- from public.erp_mirror_po_header h
+-- where h.is_deleted = false;
+--
+-- ── Option B ── If the column has a different name (e.g. "home_branch", "loc_code"):
+--
+-- This example assumes the column is called "home_branch" — change as needed.
+-- The simplest fix is to create a new view on top of the existing one:
+--
+-- drop view if exists public.app_po_search;
+-- create view public.app_po_search as
+-- select
+--   *,
+--   home_branch as branch_code   -- ← rename the real column to branch_code
+-- from public.erp_mirror_po_header
+-- where is_deleted = false;
+--
+-- ── Option C ── If branch is on a separate ERP location/shipto table:
+--
+-- You will need to join erp_mirror_po_header to that table. Contact the ERP
+-- data team to confirm which table + column maps PO → branch.
+--
+-- IMPORTANT: After updating the view, rerun check-branch-codes.mjs to
+-- confirm branch_code is now populated, then verify the supervisor Open POs
+-- page shows the expected POs.

@@ -27,8 +27,9 @@ export async function GET(_request: NextRequest) {
     }
 
     const serviceClient = createServiceClient()
+    const userBranch = profile?.branch?.trim().toUpperCase() || null
 
-    // Total row count in app_po_search
+    // ── app_po_search diagnostics ────────────────────────────────────────────
     const { count: totalCount, error: countError } = await serviceClient
       .from('app_po_search')
       .select('*', { count: 'exact', head: true })
@@ -40,43 +41,75 @@ export async function GET(_request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Distinct branch_code values (sample up to 20)
-    const { data: branchSample, error: branchError } = await serviceClient
-      .from('app_po_search')
-      .select('branch_code')
-      .not('branch_code', 'is', null)
-      .limit(200)
+    const [
+      { count: nullBranchCount },
+      { count: branchMatchCount },
+      { data: branchSample },
+    ] = await Promise.all([
+      serviceClient.from('app_po_search').select('*', { count: 'exact', head: true }).is('branch_code', null),
+      userBranch
+        ? serviceClient.from('app_po_search').select('*', { count: 'exact', head: true }).eq('branch_code', userBranch)
+        : Promise.resolve({ count: null }),
+      serviceClient.from('app_po_search').select('branch_code').not('branch_code', 'is', null).limit(200),
+    ])
 
-    const distinctBranchCodes = branchError
-      ? null
-      : Array.from(new Set((branchSample || []).map((r: any) => r.branch_code).filter(Boolean))).slice(0, 20)
+    const distinctBranchCodes = Array.from(
+      new Set((branchSample || []).map((r: any) => r.branch_code).filter(Boolean))
+    ).slice(0, 20)
 
-    // Count where branch_code is null
-    const { count: nullBranchCount, error: nullCountError } = await serviceClient
-      .from('app_po_search')
-      .select('*', { count: 'exact', head: true })
-      .is('branch_code', null)
+    // ── erp_mirror_po_header column probe ────────────────────────────────────
+    // Fetch one row with all columns so we can see what fields exist and spot
+    // anything branch-related that the view might be able to use.
+    const { data: headerSample, error: headerError } = await serviceClient
+      .from('erp_mirror_po_header')
+      .select('*')
+      .limit(1)
 
-    // Count for the user's branch specifically
-    const userBranch = profile?.branch?.trim().toUpperCase() || null
-    let branchMatchCount: number | null = null
-    if (userBranch) {
-      const { count, error: matchError } = await serviceClient
-        .from('app_po_search')
-        .select('*', { count: 'exact', head: true })
-        .eq('branch_code', userBranch)
+    const erpPoHeaderColumns = headerSample?.[0]
+      ? Object.keys(headerSample[0]).sort()
+      : headerError
+        ? { error: headerError.message }
+        : []
 
-      if (!matchError) {
-        branchMatchCount = count
-      }
+    const branchLikeColumns = Array.isArray(erpPoHeaderColumns)
+      ? erpPoHeaderColumns.filter((c: string) =>
+          c.toLowerCase().includes('branch') ||
+          c.toLowerCase().includes('location') ||
+          c.toLowerCase().includes('loc') ||
+          c.toLowerCase().includes('site') ||
+          c.toLowerCase().includes('store') ||
+          c.toLowerCase().includes('division')
+        )
+      : []
+
+    // Sample values for any branch-like columns found
+    let branchColumnSamples: Record<string, unknown[]> = {}
+    if (branchLikeColumns.length > 0) {
+      const colList = branchLikeColumns.join(', ')
+      const { data: samples } = await serviceClient
+        .from('erp_mirror_po_header')
+        .select(colList)
+        .limit(10)
+
+      branchColumnSamples = branchLikeColumns.reduce((acc: Record<string, unknown[]>, col: string) => {
+        acc[col] = Array.from(new Set((samples || []).map((r: any) => r[col]).filter(v => v != null))).slice(0, 10)
+        return acc
+      }, {})
     }
 
     return NextResponse.json({
       userBranch,
-      totalRowsInView: totalCount,
-      nullBranchCodeCount: nullCountError ? null : nullBranchCount,
-      branchMatchCount,
-      distinctBranchCodeSample: distinctBranchCodes,
+      appPoSearch: {
+        totalRows: totalCount,
+        nullBranchCodeRows: nullBranchCount,
+        branchMatchRows: branchMatchCount,
+        distinctBranchCodes,
+      },
+      erpPoHeader: {
+        allColumns: erpPoHeaderColumns,
+        branchLikeColumns,
+        branchColumnSamples,
+      },
     })
   } catch (error) {
     logError('PO diagnostics error', error)
