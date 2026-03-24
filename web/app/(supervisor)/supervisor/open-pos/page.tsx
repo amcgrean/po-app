@@ -8,7 +8,7 @@ import { formatDate } from '@/lib/utils'
 
 interface BranchDiagnostics {
   totalRowsInView: number | null
-  nullBranchCodeCount: number | null
+  nullBranchCodeCount: number | null  // kept for backward compat, not used in UI
   branchMatchCount: number | null
   distinctBranchCodeSample: string[]
 }
@@ -19,23 +19,21 @@ async function getBranchDiagnostics(branch: string): Promise<BranchDiagnostics |
 
     const [
       { count: totalCount },
-      { count: nullCount },
       { count: matchCount },
-      { data: branchSample },
+      { data: systemIdSample },
     ] = await Promise.all([
       serviceClient.from('app_po_search').select('*', { count: 'exact', head: true }),
-      serviceClient.from('app_po_search').select('*', { count: 'exact', head: true }).is('branch_code', null),
-      serviceClient.from('app_po_search').select('*', { count: 'exact', head: true }).eq('branch_code', branch),
-      serviceClient.from('app_po_search').select('branch_code').not('branch_code', 'is', null).limit(200),
+      serviceClient.from('app_po_search').select('*', { count: 'exact', head: true }).eq('system_id', branch),
+      serviceClient.from('app_po_search').select('system_id').not('system_id', 'is', null).limit(300),
     ])
 
     const distinctBranchCodes = Array.from(
-      new Set((branchSample || []).map((r: any) => r.branch_code).filter(Boolean))
+      new Set((systemIdSample || []).map((r: any) => r.system_id).filter(Boolean))
     ).slice(0, 20) as string[]
 
     return {
       totalRowsInView: totalCount,
-      nullBranchCodeCount: nullCount,
+      nullBranchCodeCount: null,
       branchMatchCount: matchCount,
       distinctBranchCodeSample: distinctBranchCodes,
     }
@@ -181,41 +179,37 @@ export default async function SupervisorOpenPoPage() {
                   <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-left text-sm text-amber-900">
                     <p className="font-semibold">Branch filter diagnostic</p>
                     <p className="mt-1 text-amber-800">
-                      Your profile branch is <strong>{branch}</strong>. The query filters{' '}
+                      Your profile branch is <strong>{branch}</strong>. Filtering{' '}
                       <code className="rounded bg-amber-100 px-1">app_po_search</code> by{' '}
-                      <code className="rounded bg-amber-100 px-1">branch_code = &apos;{branch}&apos;</code>.
+                      <code className="rounded bg-amber-100 px-1">system_id = &apos;{branch}&apos;</code>.
                     </p>
                     <ul className="mt-3 space-y-1.5 text-amber-800">
                       <li>
-                        Total rows in <code className="rounded bg-amber-100 px-1">app_po_search</code>:{' '}
+                        Total rows in view:{' '}
                         <strong>{branchDiagnostics.totalRowsInView ?? 'unknown'}</strong>
                       </li>
                       <li>
                         Rows matching <strong>{branch}</strong>:{' '}
                         <strong>{branchDiagnostics.branchMatchCount ?? 'unknown'}</strong>
                       </li>
-                      <li>
-                        Rows where <code className="rounded bg-amber-100 px-1">branch_code</code> is NULL:{' '}
-                        <strong>{branchDiagnostics.nullBranchCodeCount ?? 'unknown'}</strong>
-                      </li>
                       {branchDiagnostics.distinctBranchCodeSample.length > 0 ? (
                         <li>
-                          Sample branch codes in view:{' '}
+                          Available system_id values in view:{' '}
                           <strong>{branchDiagnostics.distinctBranchCodeSample.join(', ')}</strong>
                         </li>
                       ) : (
                         <li>
-                          <strong>No non-null branch codes found in view</strong> — the ERP mirror may not
-                          populate the <code className="rounded bg-amber-100 px-1">branch_code</code> column,
-                          or the view needs to be updated to expose it.
+                          <strong>No system_id values found in view</strong> — the ERP mirror data may
+                          not be synced yet, or the view definition needs to be updated.
                         </li>
                       )}
                     </ul>
                   </div>
                 ) : (
                   <p className="mt-1 text-sm text-gray-400">
-                    If you expect results, verify that the shared Supabase ERP mirror views are current and
-                    that the <code className="rounded bg-gray-100 px-1">branch_code</code> column is populated.
+                    If you expect results, verify that the ERP mirror data is synced and that{' '}
+                    <code className="rounded bg-gray-100 px-1">system_id</code> values in{' '}
+                    <code className="rounded bg-gray-100 px-1">app_po_search</code> match your branch code.
                   </p>
                 )}
               </div>
