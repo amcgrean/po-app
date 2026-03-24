@@ -1,10 +1,48 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import {
   getSubmissionSummariesForPurchaseOrders,
   listOpenPurchaseOrdersForBranch,
 } from '@/lib/po/server'
 import { formatDate } from '@/lib/utils'
+
+interface BranchDiagnostics {
+  totalRowsInView: number | null
+  nullBranchCodeCount: number | null
+  branchMatchCount: number | null
+  distinctBranchCodeSample: string[]
+}
+
+async function getBranchDiagnostics(branch: string): Promise<BranchDiagnostics | null> {
+  try {
+    const serviceClient = createServiceClient()
+
+    const [
+      { count: totalCount },
+      { count: nullCount },
+      { count: matchCount },
+      { data: branchSample },
+    ] = await Promise.all([
+      serviceClient.from('app_po_search').select('*', { count: 'exact', head: true }),
+      serviceClient.from('app_po_search').select('*', { count: 'exact', head: true }).is('branch_code', null),
+      serviceClient.from('app_po_search').select('*', { count: 'exact', head: true }).eq('branch_code', branch),
+      serviceClient.from('app_po_search').select('branch_code').not('branch_code', 'is', null).limit(200),
+    ])
+
+    const distinctBranchCodes = Array.from(
+      new Set((branchSample || []).map((r: any) => r.branch_code).filter(Boolean))
+    ).slice(0, 20) as string[]
+
+    return {
+      totalRowsInView: totalCount,
+      nullBranchCodeCount: nullCount,
+      branchMatchCount: matchCount,
+      distinctBranchCodeSample: distinctBranchCodes,
+    }
+  } catch {
+    return null
+  }
+}
 
 function getDataLoadErrorMessage(error: unknown) {
   const message =
@@ -58,6 +96,7 @@ export default async function SupervisorOpenPoPage() {
   let openPurchaseOrders: Awaited<ReturnType<typeof listOpenPurchaseOrdersForBranch>> = []
   let submissionSummaries: Awaited<ReturnType<typeof getSubmissionSummariesForPurchaseOrders>> = {}
   let loadErrorMessage: string | null = null
+  let branchDiagnostics: BranchDiagnostics | null = null
 
   if (branch) {
     try {
@@ -67,6 +106,10 @@ export default async function SupervisorOpenPoPage() {
       )
     } catch (error) {
       loadErrorMessage = getDataLoadErrorMessage(error)
+    }
+
+    if (!loadErrorMessage && openPurchaseOrders.length === 0) {
+      branchDiagnostics = await getBranchDiagnostics(branch)
     }
   }
 
@@ -131,12 +174,50 @@ export default async function SupervisorOpenPoPage() {
 
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
             {openPurchaseOrders.length === 0 ? (
-              <div className="px-6 py-16 text-center text-gray-500">
+              <div className="px-6 py-10 text-center text-gray-500">
                 <div className="mb-3 text-4xl">📭</div>
                 <p className="font-medium">No open purchase orders were found for branch {branch}.</p>
-                <p className="mt-1 text-sm text-gray-400">
-                  If you expect results, verify that the shared Supabase ERP mirror views are current.
-                </p>
+                {branchDiagnostics ? (
+                  <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-left text-sm text-amber-900">
+                    <p className="font-semibold">Branch filter diagnostic</p>
+                    <p className="mt-1 text-amber-800">
+                      Your profile branch is <strong>{branch}</strong>. The query filters{' '}
+                      <code className="rounded bg-amber-100 px-1">app_po_search</code> by{' '}
+                      <code className="rounded bg-amber-100 px-1">branch_code = &apos;{branch}&apos;</code>.
+                    </p>
+                    <ul className="mt-3 space-y-1.5 text-amber-800">
+                      <li>
+                        Total rows in <code className="rounded bg-amber-100 px-1">app_po_search</code>:{' '}
+                        <strong>{branchDiagnostics.totalRowsInView ?? 'unknown'}</strong>
+                      </li>
+                      <li>
+                        Rows matching <strong>{branch}</strong>:{' '}
+                        <strong>{branchDiagnostics.branchMatchCount ?? 'unknown'}</strong>
+                      </li>
+                      <li>
+                        Rows where <code className="rounded bg-amber-100 px-1">branch_code</code> is NULL:{' '}
+                        <strong>{branchDiagnostics.nullBranchCodeCount ?? 'unknown'}</strong>
+                      </li>
+                      {branchDiagnostics.distinctBranchCodeSample.length > 0 ? (
+                        <li>
+                          Sample branch codes in view:{' '}
+                          <strong>{branchDiagnostics.distinctBranchCodeSample.join(', ')}</strong>
+                        </li>
+                      ) : (
+                        <li>
+                          <strong>No non-null branch codes found in view</strong> — the ERP mirror may not
+                          populate the <code className="rounded bg-amber-100 px-1">branch_code</code> column,
+                          or the view needs to be updated to expose it.
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-400">
+                    If you expect results, verify that the shared Supabase ERP mirror views are current and
+                    that the <code className="rounded bg-gray-100 px-1">branch_code</code> column is populated.
+                  </p>
+                )}
               </div>
             ) : (
               <>
