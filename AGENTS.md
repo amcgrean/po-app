@@ -125,12 +125,79 @@ Photo check-in records submitted by workers.
 | `reviewed_by` | User ID of reviewer |
 | `reviewed_at` | Timestamp |
 
-### ERP mirror tables & views
-Raw tables: `erp_mirror_po_header`, `erp_mirror_po_detail`, `erp_mirror_po_receiving`
+### ERP mirror tables (canonical data)
 
-Read-model views (require `createServiceClient()`):
+All ERP data lives in `erp_mirror_*` tables, synced by the main ERP worker.
+Every mirror table uses:
+- `id` (auto-increment integer) as the primary key
+- `is_deleted` (boolean) for soft-delete — **always filter with `WHERE is_deleted = false`**
+- `source_updated_at` / `synced_at` timestamps for change tracking
+- `system_id` as the branch identifier
+
+> **Retired flat tables** — The old `customers`, `sales_orders`, `sales_order_lines`,
+> `inventory`, and `dispatch_orders` tables were stale prototypes with 0 rows.
+> They were dropped in migration `20260325000000_drop_stale_flat_tables.sql`.
+> Do **not** recreate or reference them.
+
+#### Customers
+
+| Table | Key | Notable columns |
+|-------|-----|-----------------|
+| `erp_mirror_cust` | `cust_key`, `cust_code` | `cust_name`, `phone`, `email`, `balance`, `credit_limit`, `credit_account`, `cust_type`, `branch_code` |
+| `erp_mirror_cust_shipto` | `cust_key` + `seq_num` | `shipto_name`, `city`, `state`, `branch_code` |
+
+> Note: `erp_mirror_cust` uses `id` as PK — there is **no** `prowid` column.
+
+#### Sales Orders
+
+| Table | Key | Notable columns |
+|-------|-----|-----------------|
+| `erp_mirror_so_header` | `system_id` + `so_id` | `cust_key`, `ship_via`, `so_status`, `expect_date`, `branch_code`, `salesperson`, `po_number`, `reference` |
+| `erp_mirror_so_detail` | `so_id` + `sequence` | `item_ptr`, `qty_ordered`, `price`, `price_uom_ptr`, `bo`, `so_desc` |
+
+#### Inventory / Items
+
+| Table | Key | Notable columns |
+|-------|-----|-----------------|
+| `erp_mirror_item` | `item_ptr` | `item` (code), `description`, `size_`, `type`, `stocking_uom`, `costing_uom`, `tally_uom`, `default_uom_conv_factor`, `pg_ptr`, `keyword_string` |
+| `erp_mirror_item_branch` | `system_id` + `item_ptr` | `item`, `active_flag`, `stock`, `display_uom`, `picking_uom`, `weight`, `weight_uom`, `buyer_id`, `handling_code`, `contentcode`, `discontinued_item` |
+| `erp_mirror_item_uomconv` | `system_id` + `item_ptr` | UOM conversion factors |
+
+#### Dispatch / Shipments
+
+| Table | Key | Notable columns |
+|-------|-----|-----------------|
+| `erp_mirror_shipments_header` | `so_id` + `shipment_num` | `ship_date`, `status_flag`, `driver`, `route_id_char`, `ship_via`, `loaded_date`, `loaded_time`, `status_flag_delivery`, `expect_date` |
+| `erp_mirror_shipments_detail` | shipment detail rows | Line-level shipment data |
+
+#### Purchase Orders
+
+| Table | Key | Notable columns |
+|-------|-----|-----------------|
+| `erp_mirror_po_header` | `system_id` + `po_id` | `supplier_key`, `shipfrom_seq`, `order_date`, `expect_date`, `buyer`, `reference`, `ship_via`, `po_status`, `wms_status` |
+| `erp_mirror_po_detail` | `po_id` + `sequence` | `item_ptr`, `qty_ordered`, `cost`, `uom`, `po_status`, `wo_id`, `expect_date` |
+| `erp_mirror_receiving_header` | `po_id` + `receive_num` | `receive_date`, `recv_status` |
+| `erp_mirror_receiving_detail` | receiving line rows | `qty` received per line |
+
+#### Other mirror tables
+
+| Table | Purpose |
+|-------|---------|
+| `erp_mirror_wo_header` | Work orders (joined by `wo_id` from PO detail) |
+| `erp_mirror_pick_header` / `_detail` | Pick tickets |
+| `erp_mirror_aropen` / `_aropendt` | AR open items |
+| `erp_mirror_print_transaction` / `_detail` | Print transactions |
+
+### Read-model views (require `createServiceClient()`)
+
+Built on top of the mirror tables; used by the app for PO workflows:
+
 - `app_po_search` — summary rows with `system_id` = branch code
-- `app_po_header`, `app_po_detail`, `app_po_receiving_summary`
+- `app_po_header` — full PO header with supplier name, totals, receiving counts
+- `app_po_detail` — PO lines joined to item master and work orders
+- `app_po_receiving_summary` — aggregate receiving stats per PO
+
+All views already filter `is_deleted = false` internally.
 
 Branch filtering uses `system_id = branch_code`. If a supervisor sees no open POs,
 check that their `profiles.branch` value matches the `system_id` values in `app_po_search`.
