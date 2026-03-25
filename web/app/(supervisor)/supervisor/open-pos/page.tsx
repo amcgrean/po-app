@@ -4,6 +4,7 @@ import {
   getSubmissionSummariesForPurchaseOrders,
   listOpenPurchaseOrdersForBranch,
 } from '@/lib/po/server'
+import type { OpenPoListRow } from '@/lib/po/types'
 import { formatDate } from '@/lib/utils'
 
 interface BranchDiagnostics {
@@ -63,15 +64,6 @@ function getDataLoadErrorMessage(error: unknown) {
   return 'Open PO data could not be loaded from Supabase.'
 }
 
-function formatCurrency(value: number | null) {
-  if (value == null) return '—'
-  return value.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
-  })
-}
-
 export const dynamic = 'force-dynamic'
 
 export default async function SupervisorOpenPoPage() {
@@ -91,7 +83,7 @@ export default async function SupervisorOpenPoPage() {
   const branch = profile?.branch?.trim().toUpperCase() || ''
   const displayName = profile?.display_name || profile?.username || 'Supervisor'
 
-  let openPurchaseOrders: Awaited<ReturnType<typeof listOpenPurchaseOrdersForBranch>> = []
+  let openPurchaseOrders: OpenPoListRow[] = []
   let submissionSummaries: Awaited<ReturnType<typeof getSubmissionSummariesForPurchaseOrders>> = {}
   let loadErrorMessage: string | null = null
   let branchDiagnostics: BranchDiagnostics | null = null
@@ -100,7 +92,7 @@ export default async function SupervisorOpenPoPage() {
     try {
       openPurchaseOrders = await listOpenPurchaseOrdersForBranch(branch, 150)
       submissionSummaries = await getSubmissionSummariesForPurchaseOrders(
-        openPurchaseOrders.map(row => row.po_number)
+        openPurchaseOrders.map(row => String(row.po_id))
       )
     } catch (error) {
       loadErrorMessage = getDataLoadErrorMessage(error)
@@ -112,7 +104,7 @@ export default async function SupervisorOpenPoPage() {
   }
 
   const withImagesCount = openPurchaseOrders.filter(
-    row => (submissionSummaries[row.po_number]?.count || 0) > 0
+    row => (submissionSummaries[String(row.po_id)]?.count || 0) > 0
   ).length
 
   return (
@@ -215,28 +207,28 @@ export default async function SupervisorOpenPoPage() {
               </div>
             ) : (
               <>
-                <div className="hidden grid-cols-[1.2fr_0.7fr_0.7fr_0.9fr_0.9fr_56px] gap-4 border-b border-gray-100 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 md:grid">
+                <div className="hidden grid-cols-[1fr_0.7fr_0.7fr_0.9fr_56px] gap-4 border-b border-gray-100 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 md:grid">
                   <span>PO / Supplier</span>
                   <span>Status</span>
                   <span>Expected</span>
-                  <span>Total</span>
                   <span>Images</span>
                   <span></span>
                 </div>
                 <div className="divide-y divide-gray-100">
                   {openPurchaseOrders.map(row => {
-                    const summary = submissionSummaries[row.po_number]
+                    const poNumber = String(row.po_id)
+                    const summary = submissionSummaries[poNumber]
                     const hasImages = (summary?.count || 0) > 0
 
                     return (
                       <Link
-                        key={row.po_number}
-                        href={`/supervisor/open-pos/${encodeURIComponent(row.po_number)}`}
-                        className="grid gap-3 px-5 py-4 transition-colors hover:bg-gray-50 md:grid-cols-[1.2fr_0.7fr_0.7fr_0.9fr_0.9fr_56px] md:items-center"
+                        key={poNumber}
+                        href={`/supervisor/open-pos/${encodeURIComponent(poNumber)}`}
+                        className="grid gap-3 px-5 py-4 transition-colors hover:bg-gray-50 md:grid-cols-[1fr_0.7fr_0.7fr_0.9fr_56px] md:items-center"
                       >
                         <div>
-                          <p className="text-lg font-bold text-gray-900">{row.po_number}</p>
-                          <p className="text-sm text-gray-500">{row.supplier_name || 'Supplier unavailable'}</p>
+                          <p className="text-lg font-bold text-gray-900">{poNumber}</p>
+                          <p className="text-sm text-gray-500">{row.supplier_key || '—'}</p>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-wide text-gray-400 md:hidden">Status</p>
@@ -247,10 +239,6 @@ export default async function SupervisorOpenPoPage() {
                           <p className="text-sm text-gray-700">
                             {row.expect_date ? formatDate(row.expect_date) : '—'}
                           </p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-wide text-gray-400 md:hidden">Total</p>
-                          <p className="text-sm text-gray-700">{formatCurrency(row.po_total)}</p>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-wide text-gray-400 md:hidden">Images</p>

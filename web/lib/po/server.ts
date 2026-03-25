@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import type {
+  OpenPoListRow,
   PoDetailRow,
   PoHeaderRow,
   PoLookupResult,
@@ -85,7 +86,7 @@ export async function searchPurchaseOrders(query: string, limit = 10): Promise<P
 export async function listOpenPurchaseOrdersForBranch(
   branchCode: string,
   limit = 100
-): Promise<PoSearchRow[]> {
+): Promise<OpenPoListRow[]> {
   const supabase = createServiceClient()
   const normalized = branchCode.trim().toUpperCase()
 
@@ -93,31 +94,22 @@ export async function listOpenPurchaseOrdersForBranch(
     return []
   }
 
-  // Filter closed/cancelled/completed statuses at the database level so the
-  // JS-side limit isn't exhausted by rows that will be thrown away anyway.
+  // Query erp_mirror_po_header directly (not the complex app_po_search view)
+  // so the is_deleted and po_status filters hit the indexed source table.
   const { data, error } = await supabase
-    .from('app_po_search')
-    .select('*')
+    .from('erp_mirror_po_header')
+    .select('po_id, system_id, supplier_key, purchase_type, order_date, expect_date, po_status, wms_status, reference, synced_at')
     .eq('system_id', normalized)
-    .not('po_status', 'ilike', '%closed%')
-    .not('po_status', 'ilike', '%cancel%')
-    .not('po_status', 'ilike', '%complete%')
-    .not('po_status', 'ilike', '%void%')
-    .not('po_status', 'ilike', '%received%')
+    .eq('is_deleted', false)
     .order('expect_date', { ascending: true, nullsFirst: false })
     .order('order_date', { ascending: false, nullsFirst: false })
-    .limit(limit)
+    .limit(limit * 5)   // over-fetch because JS status filter runs after
 
-  if (error) {
-    if (isMissingReadModel(error)) {
-      throw new Error('Shared PO read-model views are not available in Supabase yet.')
-    }
-    throw error
-  }
+  if (error) throw error
 
-  // Secondary JS filter covers wms_status and any edge-case status strings
-  return ((data || []) as PoSearchRow[])
+  return ((data || []) as OpenPoListRow[])
     .filter(row => isOpenStatus(row.po_status) && isOpenStatus(row.wms_status))
+    .slice(0, limit)
 }
 
 export async function getPurchaseOrder(poNumber: string): Promise<PoLookupResult | null> {

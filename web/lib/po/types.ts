@@ -106,3 +106,18 @@ export interface PoLookupResult {
   detail: PoDetailRow[]
   receiving: PoReceivingSummaryRow | null
 }
+
+/** Lightweight row returned by the branch open-PO list. Sourced directly from
+ *  erp_mirror_po_header (no joins) so the query is fast and reliably filtered. */
+export interface OpenPoListRow {
+  po_id: number
+  system_id: string | null
+  supplier_key: string | null
+  purchase_type: string | null
+  order_date: string | null
+  expect_date: string | null
+  po_status: string | null
+  wms_status: string | null
+  reference: string | null
+  synced_at: string | null
+}
