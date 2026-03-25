@@ -93,15 +93,20 @@ export async function listOpenPurchaseOrdersForBranch(
     return []
   }
 
-  const fetchLimit = Math.min(Math.max(limit * 3, 100), 300)
-
+  // Filter closed/cancelled/completed statuses at the database level so the
+  // JS-side limit isn't exhausted by rows that will be thrown away anyway.
   const { data, error } = await supabase
     .from('app_po_search')
     .select('*')
     .eq('system_id', normalized)
+    .not('po_status', 'ilike', '%closed%')
+    .not('po_status', 'ilike', '%cancel%')
+    .not('po_status', 'ilike', '%complete%')
+    .not('po_status', 'ilike', '%void%')
+    .not('po_status', 'ilike', '%received%')
     .order('expect_date', { ascending: true, nullsFirst: false })
     .order('order_date', { ascending: false, nullsFirst: false })
-    .limit(fetchLimit)
+    .limit(limit)
 
   if (error) {
     if (isMissingReadModel(error)) {
@@ -110,9 +115,9 @@ export async function listOpenPurchaseOrdersForBranch(
     throw error
   }
 
+  // Secondary JS filter covers wms_status and any edge-case status strings
   return ((data || []) as PoSearchRow[])
     .filter(row => isOpenStatus(row.po_status) && isOpenStatus(row.wms_status))
-    .slice(0, limit)
 }
 
 export async function getPurchaseOrder(poNumber: string): Promise<PoLookupResult | null> {
