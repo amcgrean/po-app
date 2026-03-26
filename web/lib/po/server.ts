@@ -88,22 +88,16 @@ export async function listOpenPurchaseOrdersForBranch(
   limit = 100
 ): Promise<OpenPoListRow[]> {
   const supabase = createServiceClient()
-  const normalized = branchCode.trim().toUpperCase()
+  const normalized = branchCode.trim()
 
   if (!normalized) {
     return []
   }
 
-  // Query erp_mirror_po_header directly (not the complex app_po_search view)
-  // so the is_deleted and po_status filters hit the indexed source table.
-  const { data, error } = await supabase
-    .from('erp_mirror_po_header')
-    .select('po_id, system_id, supplier_key, purchase_type, order_date, expect_date, po_status, wms_status, reference, synced_at')
-    .eq('system_id', normalized)
-    .eq('is_deleted', false)
-    .order('expect_date', { ascending: true, nullsFirst: false })
-    .order('order_date', { ascending: false, nullsFirst: false })
-    .limit(limit * 5)   // over-fetch because JS status filter runs after
+  const { data, error } = await supabase.rpc('get_branch_open_pos', {
+    branch_id: normalized,
+    row_limit: limit * 5, // over-fetch because JS status filter runs after
+  })
 
   if (error) throw error
 
@@ -116,28 +110,26 @@ export async function getPurchaseOrder(poNumber: string): Promise<PoLookupResult
   const supabase = createServiceClient()
   const normalized = poNumber.trim()
 
-  // The erp_mirror_* tables only have po_id (integer); the app_po_* views
-  // derive po_number from it. Querying by the integer po_id lets the
-  // planner use our idx_erp_mirror_*_po_id indexes instead of doing a
-  // full table scan through the po_number expression.
-  const poIdMatch = /^\d+$/.exec(normalized)
-  const filterCol = poIdMatch ? 'po_id' : 'po_number'
-  const filterVal = poIdMatch ? parseInt(normalized, 10) : normalized
+  // get_po_detail currently accepts only numeric po_id filters.
+  if (!/^\d+$/.test(normalized)) {
+    return null
+  }
 
-  const [{ data: header, error: headerError }, { data: detail, error: detailError }, { data: receiving, error: receivingError }] =
-    await Promise.all([
-      supabase.from('app_po_header').select('*').eq(filterCol, filterVal).limit(1).maybeSingle(),
-      supabase.from('app_po_detail').select('*').eq(filterCol, filterVal).order('line_number', { ascending: true }),
-      supabase.from('app_po_receiving_summary').select('*').eq(filterCol, filterVal).limit(1).maybeSingle(),
-    ])
+  const { data, error } = await supabase.rpc('get_po_detail', {
+    filter_col: 'po_id',
+    filter_val: normalized,
+  })
 
-  const firstError = headerError || detailError || receivingError
-  if (firstError) {
-    if (isMissingReadModel(firstError)) {
+  if (error) {
+    if (isMissingReadModel(error)) {
       throw new Error('Shared PO read-model views are not available in Supabase yet.')
     }
-    throw firstError
+    throw error
   }
+
+  const header = data?.header ?? null
+  const detail = data?.lines ?? []
+  const receiving = data?.receiving_summary ?? null
 
   if (!header) {
     return null

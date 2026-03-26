@@ -80,7 +80,7 @@ export default async function SupervisorOpenPoPage() {
         .maybeSingle()
     : { data: null }
 
-  const branch = profile?.branch?.trim().toUpperCase() || ''
+  const branch = profile?.branch?.trim() || ''
   const displayName = profile?.display_name || profile?.username || 'Supervisor'
 
   let openPurchaseOrders: OpenPoListRow[] = []
