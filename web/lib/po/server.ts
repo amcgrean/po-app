@@ -110,13 +110,9 @@ export async function getPurchaseOrder(poNumber: string): Promise<PoLookupResult
   const supabase = createServiceClient()
   const normalized = poNumber.trim()
 
-  // get_po_detail currently accepts only numeric po_id filters.
-  if (!/^\d+$/.test(normalized)) {
-    return null
-  }
-
+  const filterCol = /^\d+$/.test(normalized) ? 'po_id' : 'po_number'
   const { data, error } = await supabase.rpc('get_po_detail', {
-    filter_col: 'po_id',
+    filter_col: filterCol,
     filter_val: normalized,
   })
 
