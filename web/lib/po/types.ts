@@ -113,6 +113,7 @@ export interface OpenPoListRow {
   po_id: number
   system_id: string | null
   supplier_key: string | null
+  supplier_name: string | null
   purchase_type: string | null
   order_date: string | null
   expect_date: string | null

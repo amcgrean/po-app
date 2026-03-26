@@ -228,7 +228,7 @@ export default async function SupervisorOpenPoPage() {
                       >
                         <div>
                           <p className="text-lg font-bold text-gray-900">{poNumber}</p>
-                          <p className="text-sm text-gray-500">{row.supplier_key || '—'}</p>
+                          <p className="text-sm text-gray-500">{row.supplier_name || row.supplier_key || '—'}</p>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-wide text-gray-400 md:hidden">Status</p>
