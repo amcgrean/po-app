@@ -88,7 +88,7 @@ export async function listOpenPurchaseOrdersForBranch(
   limit = 100
 ): Promise<OpenPoListRow[]> {
   const supabase = createServiceClient()
-  const normalized = branchCode.trim().toUpperCase()
+  const normalized = branchCode.trim()
 
   if (!normalized) {
     return []
