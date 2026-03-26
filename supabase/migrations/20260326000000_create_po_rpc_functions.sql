@@ -10,6 +10,8 @@
 -- ────────────────────────────────────────────────────────────────────
 -- 1. get_branch_open_pos
 -- ────────────────────────────────────────────────────────────────────
+-- Drop first so we can change the return-type column definitions.
+drop function if exists public.get_branch_open_pos(text, integer);
 
 create or replace function public.get_branch_open_pos(
   branch_id  text,
@@ -58,6 +60,8 @@ grant execute on function public.get_branch_open_pos(text, integer)
 -- ────────────────────────────────────────────────────────────────────
 -- Returns a JSON object: { header, lines, receiving_summary }
 -- Only filter_col = 'po_id' is currently supported.
+-- Drop first in case an earlier version exists with a different signature.
+drop function if exists public.get_po_detail(text, text);
 
 create or replace function public.get_po_detail(
   filter_col text,
